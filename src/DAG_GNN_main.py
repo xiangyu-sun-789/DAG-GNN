@@ -230,7 +230,6 @@ if __name__ == "__main__":
 
     parser.add_argument('--no-cuda', action='store_true', default=True,
                         help='Disables CUDA training.')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed.')
     parser.add_argument('--epochs', type=int, default=300,
                         help='Number of epochs to train.')
     parser.add_argument('--batch-size', type=int, default=100,
@@ -288,10 +287,6 @@ if __name__ == "__main__":
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     args.factor = not args.no_factor
     print(args)
-
-    torch.manual_seed(args.seed)
-    if args.cuda:
-        torch.cuda.manual_seed(args.seed)
 
     if args.dynamic_graph:
         print("Testing with dynamically re-computed graph.")
