@@ -136,12 +136,13 @@ def train(epoch, best_val_loss, ground_truth_G, lambda_A, c_A, optimizer):
         graph = origin_A.data.clone().numpy()
         graph[np.abs(graph) < args.graph_threshold] = 0
 
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+        if ground_truth_G is not None:
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            shd_trian.append(shd)
 
         mse_train.append(F.mse_loss(preds, target).item())
         nll_train.append(loss_nll.item())
         kl_train.append(loss_kl.item())
-        shd_trian.append(shd)
 
     print(h_A.item())
     nll_val = []
@@ -182,8 +183,12 @@ if __name__ == "__main__":
     # -----------data parameters ------
     # configurations
     parser.add_argument('--data_type', type=str, default='synthetic',
-                        choices=['synthetic', 'discrete', 'real'],
+                        choices=['synthetic', 'discrete', 'real', 'existing'],
                         help='choosing which experiment to do.')
+    parser.add_argument('--existing_input_data_folder', type=str, default="./",
+                        help='The location of the existing input data file.')
+    parser.add_argument('--existing_input_data_file', type=str, default="",
+                        help='The file name of the existing input data file.')
     parser.add_argument('--data_filename', type=str, default='alarm',
                         help='data file name containing the discrete files.')
     parser.add_argument('--data_dir', type=str, default='data/',
@@ -477,82 +482,95 @@ if __name__ == "__main__":
             log.flush()
 
         # test()
-        print(best_ELBO_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_ELBO_graph))
-        print('Best ELBO Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+        if ground_truth_G is not None:
+            print(best_ELBO_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_ELBO_graph))
+            print('Best ELBO Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        print(best_NLL_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_NLL_graph))
-        print('Best NLL Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            print(best_NLL_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_NLL_graph))
+            print('Best NLL Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        print(best_MSE_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_MSE_graph))
-        print('Best MSE Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            print(best_MSE_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_MSE_graph))
+            print('Best MSE Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph = origin_A.data.clone().numpy()
-        graph[np.abs(graph) < 0.1] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.1, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph = origin_A.data.clone().numpy()
+            graph[np.abs(graph) < 0.1] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.1, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph[np.abs(graph) < 0.2] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.2, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph[np.abs(graph) < 0.2] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.2, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph[np.abs(graph) < 0.3] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.3, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph[np.abs(graph) < 0.3] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.3, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
 
     except KeyboardInterrupt:
-        # print the best anway
-        print(best_ELBO_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_ELBO_graph))
-        print('Best ELBO Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+        if ground_truth_G is not None:
+            # print the best anway
+            print(best_ELBO_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_ELBO_graph))
+            print('Best ELBO Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        print(best_NLL_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_NLL_graph))
-        print('Best NLL Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            print(best_NLL_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_NLL_graph))
+            print('Best NLL Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        print(best_MSE_graph)
-        print(nx.to_numpy_array(ground_truth_G))
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_MSE_graph))
-        print('Best MSE Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            print(best_MSE_graph)
+            print(nx.to_numpy_array(ground_truth_G))
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(best_MSE_graph))
+            print('Best MSE Graph Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph = origin_A.data.clone().numpy()
-        graph[np.abs(graph) < 0.1] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.1, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph = origin_A.data.clone().numpy()
+            graph[np.abs(graph) < 0.1] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.1, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph[np.abs(graph) < 0.2] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.2, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph[np.abs(graph) < 0.2] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.2, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
 
-        graph[np.abs(graph) < 0.3] = 0
-        # print(graph)
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-        print('threshold 0.3, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+            graph[np.abs(graph) < 0.3] = 0
+            # print(graph)
+            fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+            print('threshold 0.3, Accuracy: fdr', fdr, ' tpr ', tpr, ' fpr ', fpr, 'shd', shd, 'nnz', nnz)
+        else:
+            raise KeyboardInterrupt
 
-    f = open('trueG', 'w')
-    matG = np.matrix(nx.to_numpy_array(ground_truth_G))
-    for line in matG:
-        np.savetxt(f, line, fmt='%.5f')
-    f.closed
+    print("results will be saved at: ", args.existing_input_data_folder)
 
-    f1 = open('predG', 'w')
+    variable_names = ['X{}'.format(j) for j in range(1, args.data_variable_size + 1)]
+
+    if ground_truth_G is not None:
+        f = open(os.path.join(args.existing_input_data_folder, 'trueG.csv'), 'w')
+        matG = np.matrix(nx.to_numpy_array(ground_truth_G))
+        for line in matG:
+            np.savetxt(f, line, fmt='%.5f', delimiter=',')
+        f.closed
+
+        draw_DAGs_using_LINGAM(os.path.join(args.existing_input_data_folder, "trueG"), matG, variable_names)
+
+    f1 = open(os.path.join(args.existing_input_data_folder, 'predG.csv'), 'w')
     matG1 = np.matrix(origin_A.data.clone().numpy())
     for line in matG1:
-        np.savetxt(f1, line, fmt='%.5f')
+        np.savetxt(f1, line, fmt='%.5f', delimiter=',')
     f1.closed
+
+    draw_DAGs_using_LINGAM(os.path.join(args.existing_input_data_folder, "predG"), matG1, variable_names)
 
     if log is not None:
         print(save_folder)

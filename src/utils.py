@@ -1,5 +1,7 @@
+import lingam
 import numpy as np
 import torch
+from lingam.utils import make_dot
 from torch.utils.data.dataset import TensorDataset
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
@@ -413,6 +415,7 @@ def load_data(args, batch_size=1000, suffix='', debug=False):
     n, d = args.data_sample_size, args.data_variable_size
     graph_type, degree, sem_type, linear_type = args.graph_type, args.graph_degree, args.graph_sem_type, args.graph_linear_type
     x_dims = args.x_dims
+    G = None
 
     if args.data_type == 'synthetic':
         # generate data
@@ -428,6 +431,23 @@ def load_data(args, batch_size=1000, suffix='', debug=False):
             all_data, graph = read_BNrep(args)
             G = nx.DiGraph(graph)
             X = all_data['1000']['1']
+
+    elif args.data_type == 'existing':
+        print("existing input file at: ", os.path.join(args.existing_input_data_folder, args.existing_input_data_file))
+
+        normalized_X = pd.read_csv(os.path.join(args.existing_input_data_folder, args.existing_input_data_file),
+                                   header=None, index_col=None).to_numpy()
+        # print("################")
+        # print(normalized_X.shape)
+        # print(normalized_X)
+
+        # our input format is [N, D], DAG-GNN's is [N, D, x-dim]
+        X = normalized_X.reshape((normalized_X.shape[0], normalized_X.shape[1], x_dims))
+        normalized_X = None
+
+        # print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+        # print(X.shape)
+        # print(X)
 
     feat_train = torch.FloatTensor(X)
     feat_valid = torch.FloatTensor(X)
@@ -774,3 +794,21 @@ def compute_local_BiCScore(np_data, target, parents):
     bic = loglik - 0.5 * math.log(sample_size) * num_param
 
     return bic
+
+
+def draw_DAGs_using_LINGAM(file_name, adjacency_matrix, variable_names):
+    # direction of the adjacency matrix needs to be transposed.
+    # in LINGAM, the adjacency matrix is defined as column variable -> row variable
+    # in NOTEARS, the W is defined as row variable -> column variable
+
+    # there are bugs about using prior knowledge in the LINGAM package version 1.5.1, which is fixed in the version 1.5.2.
+    assert lingam.__version__ == '1.5.3', 'current LINGAM package version: ' + lingam.__version__
+
+    # the default value here was 0.01. Instead of not drawing edges smaller than 0.01, we eliminate edges
+    # smaller than `w_threshold` from the estimated graph so that we can set the value here to 0.
+    lower_limit = 0.0
+
+    dot = make_dot(np.transpose(adjacency_matrix), labels=variable_names, lower_limit=lower_limit)
+
+    dot.format = 'png'
+    dot.render(file_name)
