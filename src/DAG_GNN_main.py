@@ -258,7 +258,7 @@ if __name__ == "__main__":
                         help='Dropout rate (1 - keep probability).')
     parser.add_argument('--decoder-dropout', type=float, default=0.0,
                         help='Dropout rate (1 - keep probability).')
-    parser.add_argument('--save-folder', type=str, default='logs',
+    parser.add_argument('--save-folder', type=str, default='',
                         help='Where to save the trained model, leave empty to not save anything.')
     parser.add_argument('--load-folder', type=str, default='',
                         help='Where to load the trained model if finetunning. ' +
