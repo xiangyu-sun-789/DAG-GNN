@@ -433,10 +433,10 @@ def load_data(args, batch_size=1000, suffix='', debug=False):
             X = all_data['1000']['1']
 
     elif args.data_type == 'existing':
-        print("existing input file at: ", os.path.join(args.existing_input_data_folder, args.existing_input_data_file))
+        print("existing input file at: ", os.path.join(args.data_folder, args.existing_input_data_file))
 
-        normalized_X = pd.read_csv(os.path.join(args.existing_input_data_folder, args.existing_input_data_file),
-                                   header=None, index_col=None).to_numpy()
+        normalized_X = pd.read_csv(os.path.join(args.data_folder, args.existing_input_data_file), header=None,
+                                   index_col=None).to_numpy()
         # print("################")
         # print(normalized_X.shape)
         # print(normalized_X)
