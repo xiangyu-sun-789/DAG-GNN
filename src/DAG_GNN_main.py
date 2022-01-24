@@ -559,13 +559,13 @@ if __name__ == "__main__":
 
         draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "trueG"), matG, variable_names)
 
-    f1 = open(os.path.join(args.data_folder, 'predG.csv'), 'w')
+    f1 = open(os.path.join(args.data_folder, 'predG_no_threshold.csv'), 'w')
     matG1 = np.matrix(origin_A.data.clone().numpy())
     for line in matG1:
         np.savetxt(f1, line, fmt='%.5f', delimiter=',')
     f1.closed
 
-    draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "predG"), matG1, variable_names)
+    draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "predG_no_threshold"), matG1, variable_names)
 
     if log is not None:
         print(save_folder)
