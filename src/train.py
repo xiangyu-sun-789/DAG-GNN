@@ -21,6 +21,160 @@ import math
 from utils import *
 from modules import *
 
+
+# compute constraint h(A) value
+def _h_A(A, m):
+    expm_A = matrix_poly(A * A, m)
+    h_A = torch.trace(expm_A) - m
+    return h_A
+
+
+def stau(w, tau):
+    w1 = prox_plus(torch.abs(w) - tau)
+    return torch.sign(w) * w1
+
+
+def update_optimizer(optimizer, original_lr, c_A):
+    '''related LR to c_A, whenever c_A gets big, reduce LR proportionally'''
+    MAX_LR = 1e-2
+    MIN_LR = 1e-4
+
+    estimated_lr = original_lr / (math.log10(c_A) + 1e-10)
+    if estimated_lr > MAX_LR:
+        lr = MAX_LR
+    elif estimated_lr < MIN_LR:
+        lr = MIN_LR
+    else:
+        lr = estimated_lr
+
+    # set LR
+    for parame_group in optimizer.param_groups:
+        parame_group['lr'] = lr
+
+    return optimizer, lr
+
+
+# ===================================
+# training:
+# ===================================
+
+def train(epoch, best_val_loss, ground_truth_G, lambda_A, c_A, optimizer):
+    t = time.time()
+    nll_train = []
+    kl_train = []
+    mse_train = []
+    shd_trian = []
+
+    encoder.train()
+    decoder.train()
+    scheduler.step()
+
+    # update optimizer
+    optimizer, lr = update_optimizer(optimizer, args.lr, c_A)
+
+    for batch_idx, (data, relations) in enumerate(train_loader):
+
+        if args.cuda:
+            data, relations = data.cuda(), relations.cuda()
+        data, relations = Variable(data).double(), Variable(relations).double()
+
+        # reshape data
+        relations = relations.unsqueeze(2)
+
+        optimizer.zero_grad()
+
+        enc_x, logits, origin_A, adj_A_tilt_encoder, z_gap, z_positive, myA, Wa = encoder(data, rel_rec,
+                                                                                          rel_send)  # logits is of size: [num_sims, z_dims]
+        edges = logits
+
+        dec_x, output, adj_A_tilt_decoder = decoder(data, edges, args.data_variable_size * args.x_dims, rel_rec,
+                                                    rel_send, origin_A, adj_A_tilt_encoder, Wa)
+
+        if torch.sum(output != output):
+            print('nan error\n')
+
+        target = data
+        preds = output
+        variance = 0.
+
+        # reconstruction accuracy loss
+        loss_nll = nll_gaussian(preds, target, variance)
+
+        # KL loss
+        loss_kl = kl_gaussian_sem(logits)
+
+        # ELBO loss:
+        loss = loss_kl + loss_nll
+
+        # add A loss
+        one_adj_A = origin_A  # torch.mean(adj_A_tilt_decoder, dim =0)
+        sparse_loss = args.tau_A * torch.sum(torch.abs(one_adj_A))
+
+        # other loss term
+        if args.use_A_connect_loss:
+            connect_gap = A_connect_loss(one_adj_A, args.graph_threshold, z_gap)
+            loss += lambda_A * connect_gap + 0.5 * c_A * connect_gap * connect_gap
+
+        if args.use_A_positiver_loss:
+            positive_gap = A_positive_loss(one_adj_A, z_positive)
+            loss += .1 * (lambda_A * positive_gap + 0.5 * c_A * positive_gap * positive_gap)
+
+        # compute h(A)
+        h_A = _h_A(origin_A, args.data_variable_size)
+        loss += lambda_A * h_A + 0.5 * c_A * h_A * h_A + 100. * torch.trace(
+            origin_A * origin_A) + sparse_loss  # +  0.01 * torch.sum(variance * variance)
+
+        loss.backward()
+        loss = optimizer.step()
+
+        myA.data = stau(myA.data, args.tau_A * lr)
+
+        if torch.sum(origin_A != origin_A):
+            print('nan error\n')
+
+        # compute metrics
+        graph = origin_A.data.clone().numpy()
+        graph[np.abs(graph) < args.graph_threshold] = 0
+
+        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
+
+        mse_train.append(F.mse_loss(preds, target).item())
+        nll_train.append(loss_nll.item())
+        kl_train.append(loss_kl.item())
+        shd_trian.append(shd)
+
+    print(h_A.item())
+    nll_val = []
+    acc_val = []
+    kl_val = []
+    mse_val = []
+
+    print('Epoch: {:04d}'.format(epoch),
+          'nll_train: {:.10f}'.format(np.mean(nll_train)),
+          'kl_train: {:.10f}'.format(np.mean(kl_train)),
+          'ELBO_loss: {:.10f}'.format(np.mean(kl_train) + np.mean(nll_train)),
+          'mse_train: {:.10f}'.format(np.mean(mse_train)),
+          'shd_trian: {:.10f}'.format(np.mean(shd_trian)),
+          'time: {:.4f}s'.format(time.time() - t))
+    if args.save_folder and np.mean(nll_val) < best_val_loss:
+        torch.save(encoder.state_dict(), encoder_file)
+        torch.save(decoder.state_dict(), decoder_file)
+        print('Best model so far, saving...')
+        print('Epoch: {:04d}'.format(epoch),
+              'nll_train: {:.10f}'.format(np.mean(nll_train)),
+              'kl_train: {:.10f}'.format(np.mean(kl_train)),
+              'ELBO_loss: {:.10f}'.format(np.mean(kl_train) + np.mean(nll_train)),
+              'mse_train: {:.10f}'.format(np.mean(mse_train)),
+              'shd_trian: {:.10f}'.format(np.mean(shd_trian)),
+              'time: {:.4f}s'.format(time.time() - t), file=log)
+        log.flush()
+
+    if 'graph' not in vars():
+        print('error on assign')
+
+    return np.mean(np.mean(kl_train) + np.mean(nll_train)), np.mean(nll_train), np.mean(mse_train), graph, origin_A
+
+
 parser = argparse.ArgumentParser()
 
 # -----------data parameters ------
@@ -251,162 +405,7 @@ if args.cuda:
 rel_rec = Variable(rel_rec)
 rel_send = Variable(rel_send)
 
-
-# compute constraint h(A) value
-def _h_A(A, m):
-    expm_A = matrix_poly(A * A, m)
-    h_A = torch.trace(expm_A) - m
-    return h_A
-
-
 prox_plus = torch.nn.Threshold(0., 0.)
-
-
-def stau(w, tau):
-    w1 = prox_plus(torch.abs(w) - tau)
-    return torch.sign(w) * w1
-
-
-def update_optimizer(optimizer, original_lr, c_A):
-    '''related LR to c_A, whenever c_A gets big, reduce LR proportionally'''
-    MAX_LR = 1e-2
-    MIN_LR = 1e-4
-
-    estimated_lr = original_lr / (math.log10(c_A) + 1e-10)
-    if estimated_lr > MAX_LR:
-        lr = MAX_LR
-    elif estimated_lr < MIN_LR:
-        lr = MIN_LR
-    else:
-        lr = estimated_lr
-
-    # set LR
-    for parame_group in optimizer.param_groups:
-        parame_group['lr'] = lr
-
-    return optimizer, lr
-
-
-# ===================================
-# training:
-# ===================================
-
-def train(epoch, best_val_loss, ground_truth_G, lambda_A, c_A, optimizer):
-    t = time.time()
-    nll_train = []
-    kl_train = []
-    mse_train = []
-    shd_trian = []
-
-    encoder.train()
-    decoder.train()
-    scheduler.step()
-
-    # update optimizer
-    optimizer, lr = update_optimizer(optimizer, args.lr, c_A)
-
-    for batch_idx, (data, relations) in enumerate(train_loader):
-
-        if args.cuda:
-            data, relations = data.cuda(), relations.cuda()
-        data, relations = Variable(data).double(), Variable(relations).double()
-
-        # reshape data
-        relations = relations.unsqueeze(2)
-
-        optimizer.zero_grad()
-
-        enc_x, logits, origin_A, adj_A_tilt_encoder, z_gap, z_positive, myA, Wa = encoder(data, rel_rec,
-                                                                                          rel_send)  # logits is of size: [num_sims, z_dims]
-        edges = logits
-
-        dec_x, output, adj_A_tilt_decoder = decoder(data, edges, args.data_variable_size * args.x_dims, rel_rec,
-                                                    rel_send, origin_A, adj_A_tilt_encoder, Wa)
-
-        if torch.sum(output != output):
-            print('nan error\n')
-
-        target = data
-        preds = output
-        variance = 0.
-
-        # reconstruction accuracy loss
-        loss_nll = nll_gaussian(preds, target, variance)
-
-        # KL loss
-        loss_kl = kl_gaussian_sem(logits)
-
-        # ELBO loss:
-        loss = loss_kl + loss_nll
-
-        # add A loss
-        one_adj_A = origin_A  # torch.mean(adj_A_tilt_decoder, dim =0)
-        sparse_loss = args.tau_A * torch.sum(torch.abs(one_adj_A))
-
-        # other loss term
-        if args.use_A_connect_loss:
-            connect_gap = A_connect_loss(one_adj_A, args.graph_threshold, z_gap)
-            loss += lambda_A * connect_gap + 0.5 * c_A * connect_gap * connect_gap
-
-        if args.use_A_positiver_loss:
-            positive_gap = A_positive_loss(one_adj_A, z_positive)
-            loss += .1 * (lambda_A * positive_gap + 0.5 * c_A * positive_gap * positive_gap)
-
-        # compute h(A)
-        h_A = _h_A(origin_A, args.data_variable_size)
-        loss += lambda_A * h_A + 0.5 * c_A * h_A * h_A + 100. * torch.trace(
-            origin_A * origin_A) + sparse_loss  # +  0.01 * torch.sum(variance * variance)
-
-        loss.backward()
-        loss = optimizer.step()
-
-        myA.data = stau(myA.data, args.tau_A * lr)
-
-        if torch.sum(origin_A != origin_A):
-            print('nan error\n')
-
-        # compute metrics
-        graph = origin_A.data.clone().numpy()
-        graph[np.abs(graph) < args.graph_threshold] = 0
-
-        fdr, tpr, fpr, shd, nnz = count_accuracy(ground_truth_G, nx.DiGraph(graph))
-
-        mse_train.append(F.mse_loss(preds, target).item())
-        nll_train.append(loss_nll.item())
-        kl_train.append(loss_kl.item())
-        shd_trian.append(shd)
-
-    print(h_A.item())
-    nll_val = []
-    acc_val = []
-    kl_val = []
-    mse_val = []
-
-    print('Epoch: {:04d}'.format(epoch),
-          'nll_train: {:.10f}'.format(np.mean(nll_train)),
-          'kl_train: {:.10f}'.format(np.mean(kl_train)),
-          'ELBO_loss: {:.10f}'.format(np.mean(kl_train) + np.mean(nll_train)),
-          'mse_train: {:.10f}'.format(np.mean(mse_train)),
-          'shd_trian: {:.10f}'.format(np.mean(shd_trian)),
-          'time: {:.4f}s'.format(time.time() - t))
-    if args.save_folder and np.mean(nll_val) < best_val_loss:
-        torch.save(encoder.state_dict(), encoder_file)
-        torch.save(decoder.state_dict(), decoder_file)
-        print('Best model so far, saving...')
-        print('Epoch: {:04d}'.format(epoch),
-              'nll_train: {:.10f}'.format(np.mean(nll_train)),
-              'kl_train: {:.10f}'.format(np.mean(kl_train)),
-              'ELBO_loss: {:.10f}'.format(np.mean(kl_train) + np.mean(nll_train)),
-              'mse_train: {:.10f}'.format(np.mean(mse_train)),
-              'shd_trian: {:.10f}'.format(np.mean(shd_trian)),
-              'time: {:.4f}s'.format(time.time() - t), file=log)
-        log.flush()
-
-    if 'graph' not in vars():
-        print('error on assign')
-
-    return np.mean(np.mean(kl_train) + np.mean(nll_train)), np.mean(nll_train), np.mean(mse_train), graph, origin_A
-
 
 # ===================================
 # main
