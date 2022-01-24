@@ -568,6 +568,6 @@ if __name__ == "__main__":
 
     draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "predG_no_threshold"), matG1, variable_names)
 
-    if log is not None:
-        print(save_folder)
-        log.close()
+    # if log is not None:
+    #     print(save_folder)
+    #     log.close()
