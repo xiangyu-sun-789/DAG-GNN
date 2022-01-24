@@ -185,8 +185,8 @@ if __name__ == "__main__":
     parser.add_argument('--data_type', type=str, default='synthetic',
                         choices=['synthetic', 'discrete', 'real', 'existing'],
                         help='choosing which experiment to do.')
-    parser.add_argument('--existing_input_data_folder', type=str, default="./",
-                        help='The location of the existing input data file.')
+    parser.add_argument('--data_folder', type=str, default="./",
+                        help='The location of the existing input data file and saved results.')
     parser.add_argument('--existing_input_data_file', type=str, default="",
                         help='The file name of the existing input data file.')
     parser.add_argument('--data_filename', type=str, default='alarm',
@@ -551,26 +551,26 @@ if __name__ == "__main__":
         else:
             raise KeyboardInterrupt
 
-    print("results will be saved at: ", args.existing_input_data_folder)
+    print("results will be saved at: ", args.data_folder)
 
     variable_names = ['X{}'.format(j) for j in range(1, args.data_variable_size + 1)]
 
     if ground_truth_G is not None:
-        f = open(os.path.join(args.existing_input_data_folder, 'trueG.csv'), 'w')
+        f = open(os.path.join(args.data_folder, 'trueG.csv'), 'w')
         matG = np.matrix(nx.to_numpy_array(ground_truth_G))
         for line in matG:
             np.savetxt(f, line, fmt='%.5f', delimiter=',')
         f.closed
 
-        draw_DAGs_using_LINGAM(os.path.join(args.existing_input_data_folder, "trueG"), matG, variable_names)
+        draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "trueG"), matG, variable_names)
 
-    f1 = open(os.path.join(args.existing_input_data_folder, 'predG.csv'), 'w')
+    f1 = open(os.path.join(args.data_folder, 'predG.csv'), 'w')
     matG1 = np.matrix(origin_A.data.clone().numpy())
     for line in matG1:
         np.savetxt(f1, line, fmt='%.5f', delimiter=',')
     f1.closed
 
-    draw_DAGs_using_LINGAM(os.path.join(args.existing_input_data_folder, "predG"), matG1, variable_names)
+    draw_DAGs_using_LINGAM(os.path.join(args.data_folder, "predG"), matG1, variable_names)
 
     if log is not None:
         print(save_folder)
