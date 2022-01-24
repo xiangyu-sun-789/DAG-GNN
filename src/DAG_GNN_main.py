@@ -266,6 +266,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--h_tol', type=float, default=1e-8,
                         help='the tolerance of error of h(A) to zero')
+    parser.add_argument('--rho_max', type=float, default=1e+20)
     parser.add_argument('--prediction-steps', type=int, default=10, metavar='N',
                         help='Num steps to predict before re-using teacher forcing.')
     parser.add_argument('--lr-decay', type=int, default=200,
@@ -431,7 +432,7 @@ if __name__ == "__main__":
 
     try:
         for step_k in range(k_max_iter):
-            while c_A < 1e+20:
+            while c_A < float(args.rho_max):
                 for epoch in range(args.epochs):
                     ELBO_loss, NLL_loss, MSE_loss, graph, origin_A = train(epoch, best_ELBO_loss, ground_truth_G,
                                                                            lambda_A,
