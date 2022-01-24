@@ -19,6 +19,7 @@ import pickle
 import math
 from torch.optim.adam import Adam
 
+
 # data generating functions
 
 def simulate_random_dag(d: int,
@@ -91,7 +92,7 @@ def simulate_sem(G: nx.DiGraph,
         elif linear_type == 'nonlinear_1':
             eta = np.cos(X[:, parents, 0] + 1).dot(W[parents, j])
         elif linear_type == 'nonlinear_2':
-            eta = (X[:, parents, 0]+0.5).dot(W[parents, j])
+            eta = (X[:, parents, 0] + 0.5).dot(W[parents, j])
         else:
             raise ValueError('unknown linear data type')
 
@@ -101,17 +102,20 @@ def simulate_sem(G: nx.DiGraph,
             elif linear_type == 'nonlinear_1':
                 X[:, j, 0] = eta + np.random.normal(scale=noise_scale, size=n)
             elif linear_type == 'nonlinear_2':
-                X[:, j, 0] = 2.*np.sin(eta) + eta + np.random.normal(scale=noise_scale, size=n)
+                X[:, j, 0] = 2. * np.sin(eta) + eta + np.random.normal(scale=noise_scale, size=n)
         elif sem_type == 'linear-exp':
             X[:, j, 0] = eta + np.random.exponential(scale=noise_scale, size=n)
         elif sem_type == 'linear-gumbel':
             X[:, j, 0] = eta + np.random.gumbel(scale=noise_scale, size=n)
         else:
             raise ValueError('unknown sem type')
-    if x_dims > 1 :
-        for i in range(x_dims-1):
-            X[:, :, i+1] = np.random.normal(scale=noise_scale, size=1)*X[:, :, 0] + np.random.normal(scale=noise_scale, size=1) + np.random.normal(scale=noise_scale, size=(n, d))
-        X[:, :, 0] = np.random.normal(scale=noise_scale, size=1) * X[:, :, 0] + np.random.normal(scale=noise_scale, size=1) + np.random.normal(scale=noise_scale, size=(n, d))
+    if x_dims > 1:
+        for i in range(x_dims - 1):
+            X[:, :, i + 1] = np.random.normal(scale=noise_scale, size=1) * X[:, :, 0] + np.random.normal(
+                scale=noise_scale, size=1) + np.random.normal(scale=noise_scale, size=(n, d))
+        X[:, :, 0] = np.random.normal(scale=noise_scale, size=1) * X[:, :, 0] + np.random.normal(scale=noise_scale,
+                                                                                                 size=1) + np.random.normal(
+            scale=noise_scale, size=(n, d))
     return X
 
 
@@ -193,10 +197,9 @@ def count_accuracy(G_true: nx.DiGraph,
     return fdr, tpr, fpr, shd, pred_size
 
 
-
-#========================================
+# ========================================
 # VAE utility functions
-#========================================
+# ========================================
 def my_softmax(input, axis=1):
     trans_input = input.transpose(axis, 0).contiguous()
     soft_max_1d = F.softmax(trans_input)
@@ -298,18 +301,21 @@ def gumbel_softmax(logits, tau=1, hard=False, eps=1e-10):
         y = y_soft
     return y
 
-def gauss_sample_z(logits,zsize):
-    U = torch.randn(logits.size(0),zsize).double()
-    x = torch.zeros(logits.size(0),1, zsize).double()
+
+def gauss_sample_z(logits, zsize):
+    U = torch.randn(logits.size(0), zsize).double()
+    x = torch.zeros(logits.size(0), 1, zsize).double()
     for j in range(logits.size(0)):
-        x[j,0,:] = U[j,:]*torch.exp(logits[j,0,zsize:2*zsize])+logits[j,0,0:zsize]
+        x[j, 0, :] = U[j, :] * torch.exp(logits[j, 0, zsize:2 * zsize]) + logits[j, 0, 0:zsize]
     return x
 
-def gauss_sample_z_new(logits,zsize):
-    U = torch.randn(logits.size(0),logits.size(1),zsize).double()
-    x = torch.zeros(logits.size(0),logits.size(1),zsize).double()
+
+def gauss_sample_z_new(logits, zsize):
+    U = torch.randn(logits.size(0), logits.size(1), zsize).double()
+    x = torch.zeros(logits.size(0), logits.size(1), zsize).double()
     x[:, :, :] = U[:, :, :] + logits[:, :, 0:zsize]
     return x
+
 
 def binary_accuracy(output, labels):
     preds = output > 0.5
@@ -329,9 +335,9 @@ def read_BNrep(args):
         data_dir = os.path.join(args.data_dir, 'alarm/')
     elif args.data_filename == 'child':
         data_dir = os.path.join(args.data_dir, 'child/')
-    elif args.data_filename =='hail':
+    elif args.data_filename == 'hail':
         data_dir = os.path.join(args.data_dir, 'hail/')
-    elif args.data_filename =='alarm10':
+    elif args.data_filename == 'alarm10':
         data_dir = os.path.join(args.data_dir, 'alarm10/')
     elif args.data_filename == 'child10':
         data_dir = os.path.join(args.data_dir, 'child10/')
@@ -340,14 +346,14 @@ def read_BNrep(args):
 
     all_data = dict()
     # read text files
-    file_pattern = data_dir +"*_s*_v*.txt"
+    file_pattern = data_dir + "*_s*_v*.txt"
     all_files = glob.iglob(file_pattern)
     for file in all_files:
         match = re.search('/([\w]+)_s([\w]+)_v([\w]+).txt', file)
-        dataset, samplesN, version = match.group(1), match.group(2),match.group(3)
+        dataset, samplesN, version = match.group(1), match.group(2), match.group(3)
 
         # read file
-        data = np.loadtxt(file, skiprows =0, dtype=np.int32)
+        data = np.loadtxt(file, skiprows=0, dtype=np.int32)
         if samplesN not in all_data:
             all_data[samplesN] = dict()
 
@@ -359,11 +365,12 @@ def read_BNrep(args):
     file_pattern = data_dir + "*_graph.txt"
     files = glob.iglob(file_pattern)
     for f in files:
-        graph = np.loadtxt(f, skiprows =0, dtype=np.int32)
+        graph = np.loadtxt(f, skiprows=0, dtype=np.int32)
 
-    return all_data, graph # in dictionary
+    return all_data, graph  # in dictionary
 
-def load_data_discrete(args, batch_size=1000, suffix='', debug = False):
+
+def load_data_discrete(args, batch_size=1000, suffix='', debug=False):
     #  # configurations
     n, d = args.data_sample_size, args.data_variable_size
     graph_type, degree, sem_type = args.graph_type, args.graph_degree, args.graph_sem_type
@@ -400,7 +407,8 @@ def load_data_discrete(args, batch_size=1000, suffix='', debug = False):
 
     return train_data_loader, valid_data_loader, test_data_loader, G, max_X_card, X
 
-def load_data(args, batch_size=1000, suffix='', debug = False):
+
+def load_data(args, batch_size=1000, suffix='', debug=False):
     #  # configurations
     n, d = args.data_sample_size, args.data_variable_size
     graph_type, degree, sem_type, linear_type = args.graph_type, args.graph_degree, args.graph_sem_type, args.graph_linear_type
@@ -420,7 +428,6 @@ def load_data(args, batch_size=1000, suffix='', debug = False):
             all_data, graph = read_BNrep(args)
             G = nx.DiGraph(graph)
             X = all_data['1000']['1']
-
 
     feat_train = torch.FloatTensor(X)
     feat_valid = torch.FloatTensor(X)
@@ -555,24 +562,26 @@ def get_correct_per_bucket_(bucket_idx, pred, target):
     return correct_per_bucket
 
 
-
 def kl_categorical(preds, log_prior, num_atoms, eps=1e-16):
     kl_div = preds * (torch.log(preds + eps) - torch.log(log_prior + eps))
     return kl_div.sum() / (num_atoms)
 
+
 def kl_gaussian(preds, zsize):
     predsnew = preds.squeeze(1)
-    mu = predsnew[:,0:zsize]
-    log_sigma = predsnew[:,zsize:2*zsize]
-    kl_div = torch.exp(2*log_sigma) - 2*log_sigma + mu * mu
+    mu = predsnew[:, 0:zsize]
+    log_sigma = predsnew[:, zsize:2 * zsize]
+    kl_div = torch.exp(2 * log_sigma) - 2 * log_sigma + mu * mu
     kl_sum = kl_div.sum()
-    return (kl_sum / (preds.size(0)) - zsize)*0.5
+    return (kl_sum / (preds.size(0)) - zsize) * 0.5
+
 
 def kl_gaussian_sem(preds):
     mu = preds
     kl_div = mu * mu
     kl_sum = kl_div.sum()
-    return (kl_sum / (preds.size(0)))*0.5
+    return (kl_sum / (preds.size(0))) * 0.5
+
 
 def kl_categorical_uniform(preds, num_atoms, num_edge_types, add_const=False,
                            eps=1e-16):
@@ -582,61 +591,70 @@ def kl_categorical_uniform(preds, num_atoms, num_edge_types, add_const=False,
         kl_div += const
     return kl_div.sum() / (num_atoms * preds.size(0))
 
-def nll_catogrical(preds, target, add_const = False):
+
+def nll_catogrical(preds, target, add_const=False):
     '''compute the loglikelihood of discrete variables
     '''
     # loss = nn.CrossEntropyLoss()
 
     total_loss = 0
     for node_size in range(preds.size(1)):
-        total_loss += - (torch.log(preds[:,node_size, target[:, node_size].long()]) * target[:, node_size]).mean()
+        total_loss += - (torch.log(preds[:, node_size, target[:, node_size].long()]) * target[:, node_size]).mean()
 
     return total_loss
+
 
 def nll_gaussian(preds, target, variance, add_const=False):
     mean1 = preds
     mean2 = target
-    neg_log_p = variance + torch.div(torch.pow(mean1 - mean2, 2), 2.*np.exp(2. * variance))
+    neg_log_p = variance + torch.div(torch.pow(mean1 - mean2, 2), 2. * np.exp(2. * variance))
     if add_const:
         const = 0.5 * torch.log(2 * torch.from_numpy(np.pi) * variance)
         neg_log_p += const
     return neg_log_p.sum() / (target.size(0))
 
-#Symmetrically normalize adjacency matrix.
+
+# Symmetrically normalize adjacency matrix.
 def normalize_adj(adj):
-    rowsum = torch.abs(torch.sum(adj,1))
+    rowsum = torch.abs(torch.sum(adj, 1))
     d_inv_sqrt = torch.pow(rowsum, -0.5)
     d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.
     d_mat_inv_sqrt = torch.diag(d_inv_sqrt)
-    myr = torch.matmul(torch.matmul(d_mat_inv_sqrt,adj),d_mat_inv_sqrt)
+    myr = torch.matmul(torch.matmul(d_mat_inv_sqrt, adj), d_mat_inv_sqrt)
     myr[isnan(myr)] = 0.
     return myr
 
+
 def preprocess_adj(adj):
-    adj_normalized = (torch.eye(adj.shape[0]).double() + (adj.transpose(0,1)))
+    adj_normalized = (torch.eye(adj.shape[0]).double() + (adj.transpose(0, 1)))
     return adj_normalized
+
 
 def preprocess_adj_new(adj):
-    adj_normalized = (torch.eye(adj.shape[0]).double() - (adj.transpose(0,1)))
+    adj_normalized = (torch.eye(adj.shape[0]).double() - (adj.transpose(0, 1)))
     return adj_normalized
+
 
 def preprocess_adj_new1(adj):
-    adj_normalized = torch.inverse(torch.eye(adj.shape[0]).double()-adj.transpose(0,1))
+    adj_normalized = torch.inverse(torch.eye(adj.shape[0]).double() - adj.transpose(0, 1))
     return adj_normalized
 
+
 def isnan(x):
-    return x!=x
+    return x != x
+
 
 def my_normalize(z):
     znor = torch.zeros(z.size()).double()
     for i in range(z.size(0)):
-        testnorm = torch.norm(z[i,:,:], dim=0)
-        znor[i,:,:] = z[i,:,:]/testnorm
+        testnorm = torch.norm(z[i, :, :], dim=0)
+        znor[i, :, :] = z[i, :, :] / testnorm
     znor[isnan(znor)] = 0.0
     return znor
 
+
 def sparse_to_tuple(sparse_mx):
-#    """Convert sparse matrix to tuple representation."""
+    #    """Convert sparse matrix to tuple representation."""
     def to_tuple(mx):
         if not sp.isspmatrix_coo(mx):
             mx = mx.tocoo()
@@ -655,7 +673,7 @@ def sparse_to_tuple(sparse_mx):
 
 
 def matrix_poly(matrix, d):
-    x = torch.eye(d).double()+ torch.div(matrix, d)
+    x = torch.eye(d).double() + torch.div(matrix, d)
     return torch.matrix_power(x, d)
 
 
@@ -664,13 +682,14 @@ def A_connect_loss(A, tol, z):
     d = A.size()[0]
     loss = 0
     for i in range(d):
-        loss +=  2 * tol - torch.sum(torch.abs(A[:,i])) - torch.sum(torch.abs(A[i,:])) + z * z
+        loss += 2 * tol - torch.sum(torch.abs(A[:, i])) - torch.sum(torch.abs(A[i, :])) + z * z
     return loss
+
 
 # element loss: make sure each A_ij > 0
 def A_positive_loss(A, z_positive):
     result = - A + z_positive * z_positive
-    loss =  torch.sum(result)
+    loss = torch.sum(result)
 
     return loss
 
@@ -678,13 +697,15 @@ def A_positive_loss(A, z_positive):
 '''
 COMPUTE SCORES FOR BN
 '''
+
+
 def compute_BiCScore(G, D):
     '''compute the bic score'''
     # score = gm.estimators.BicScore(self.data).score(self.model)
     origin_score = []
     num_var = G.shape[0]
     for i in range(num_var):
-        parents = np.where(G[:,i] !=0)
+        parents = np.where(G[:, i] != 0)
         score_one = compute_local_BiCScore(D, i, parents)
         origin_score.append(score_one)
 
@@ -745,11 +766,11 @@ def compute_local_BiCScore(np_data, target, parents):
         local_count = sum(count_d[parents_state].values())
         for self_state in count_d[parents_state]:
             loglik += count_d[parents_state][self_state] * (
-                        math.log(count_d[parents_state][self_state] + 0.1) - math.log(local_count))
+                    math.log(count_d[parents_state][self_state] + 0.1) - math.log(local_count))
 
     # penality
     num_param = num_parent_state * (
-                num_self_state - 1)  # count_faster(count_d) - len(count_d) - 1 # minus top level and minus one
+            num_self_state - 1)  # count_faster(count_d) - len(count_d) - 1 # minus top level and minus one
     bic = loglik - 0.5 * math.log(sample_size) * num_param
 
     return bic
